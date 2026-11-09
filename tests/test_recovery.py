@@ -5,6 +5,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from subprocess import CompletedProcess
 from contextlib import contextmanager
 from unittest.mock import patch
 import project_recovery as recovery
@@ -113,6 +114,30 @@ class RecoveryTests(unittest.TestCase):
         self.assertIn("folder", assignments)
         self.assertNotIn("agent", assignments)
         self.assertNotIn("standalone", assignments)
+
+    def test_path_normalization_supports_macos_and_windows(self):
+        self.assertEqual(recovery.normalize("/Users/me/Projects/../Projects/Atlas"),
+                         "/Users/me/Projects/Atlas")
+        self.assertEqual(recovery.normalize("/Users/me/Cafe\u0301"),
+                         recovery.normalize("/Users/me/Caf\u00e9"))
+        self.assertEqual(recovery.normalize("\\\\?\\X:\\Cedar\\."),
+                         recovery.normalize("x:\\cedar"))
+
+    def test_macos_open_app_stops_mutation(self):
+        processes = "/Applications/Codex.app/Contents/MacOS/Codex\n/usr/bin/python3\n"
+        result = CompletedProcess(["ps"], 0, stdout=processes, stderr="")
+        with patch.object(recovery.sys, "platform", "darwin"), \
+                patch.object(recovery.subprocess, "run", return_value=result) as run:
+            with self.assertRaisesRegex(recovery.RecoveryError, "Fully quit"):
+                recovery.require_closed()
+        run.assert_called_once_with(["ps", "-axo", "comm="], capture_output=True,
+                                    text=True, check=True)
+
+    def test_macos_closed_app_allows_recovery(self):
+        result = CompletedProcess(["ps"], 0, stdout="/usr/bin/python3\n", stderr="")
+        with patch.object(recovery.sys, "platform", "darwin"), \
+                patch.object(recovery.subprocess, "run", return_value=result):
+            recovery.require_closed()
 
     def test_ambiguous_matching_skipped(self):
         with database(self.db) as con:

@@ -1,6 +1,6 @@
 import contextlib
 import io
-import sys
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 import one_click
@@ -56,9 +56,18 @@ class OneClickTests(unittest.TestCase):
                 self.assertEqual(one_click.run(self.fixture.home, self.fixture.data, diagnose=True), 0)
         self.assertEqual(recovery.read_json(self.fixture.state_path), self.fixture.state)
 
-    def test_bundled_runtime_is_isolated(self):
-        self.assertEqual(sys.flags.isolated, 1)
-        self.assertFalse(any("site-packages" in path for path in sys.path))
+    def test_launchers_ignore_user_python_environment(self):
+        root = Path(one_click.__file__).parent
+        self.assertIn('-E -s "$SCRIPT_DIR/one_click.py"',
+                      (root / "START-RECOVERY.command").read_text(encoding="utf-8"))
+        self.assertIn('python.exe" -I',
+                      (root / "START-RECOVERY.bat").read_text(encoding="utf-8"))
+
+    def test_macos_default_data_directory(self):
+        with patch.object(recovery.sys, "platform", "darwin"):
+            path = recovery.default_data_dir()
+        self.assertEqual(path, Path.home() / "Library" / "Application Support" /
+                         "CodexProjectRecovery")
 
 
 if __name__ == "__main__":

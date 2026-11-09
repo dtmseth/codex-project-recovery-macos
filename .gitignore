@@ -4,6 +4,8 @@ __pycache__/
 venv/
 runtime/
 Codex-Project-Recovery-One-Click-Windows-*.zip
+Codex-Project-Recovery-macOS-*.zip
+.DS_Store
 *.sqlite
 *.sqlite-*
 .*codex-global-state*.json*

@@ -1,4 +1,4 @@
-"""Windows local project organization recovery. Standard-library-only, offline, manual."""
+"""macOS and Windows local project organization recovery. Offline and standard-library-only."""
 import argparse
 import copy
 import csv
@@ -7,16 +7,18 @@ import io
 import json
 import ntpath
 import os
+import posixpath
 from pathlib import Path
 import re
 import shutil
 import sqlite3
 import subprocess
 import sys
+import unicodedata
 from contextlib import closing
 from datetime import datetime, timezone
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 ORG_KEYS = (
     "local-projects", "thread-project-assignments", "thread-project-membership-host-ids",
     "app-server-project-id-by-legacy-project-id-by-host", "projectless-thread-ids",
@@ -54,18 +56,37 @@ def stamp():
 
 
 def normalize(path):
-    return ntpath.normcase(ntpath.normpath(re.sub(r"^\\+\?\\+", "", path)))
+    """Normalize saved roots without interpreting Windows paths as POSIX paths (or vice versa)."""
+    path = unicodedata.normalize("NFC", str(path))
+    if re.match(r"^(?:[A-Za-z]:[\\/]|\\\\)", path):
+        return ntpath.normcase(ntpath.normpath(re.sub(r"^\\+\?\\+", "", path)))
+    return posixpath.normpath(path)
 
 
 def require_closed():
-    if os.name != "nt":
-        raise RecoveryError("This release supports Windows only.")
-    result = subprocess.run(["tasklist.exe", "/FO", "CSV", "/NH"], capture_output=True,
-                            text=True, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
-    # Case-insensitive matching also catches the codex.exe local server/CLI.
-    running = {row[0].lower() for row in csv.reader(io.StringIO(result.stdout)) if row}
-    if running & {"chatgpt.exe", "codex.exe"}:
+    if sys.platform == "win32":
+        result = subprocess.run(["tasklist.exe", "/FO", "CSV", "/NH"], capture_output=True,
+                                text=True, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        # Case-insensitive matching also catches the codex.exe local server/CLI.
+        running = {row[0].casefold() for row in csv.reader(io.StringIO(result.stdout)) if row}
+        app_names = {"chatgpt.exe", "codex.exe"}
+    elif sys.platform == "darwin":
+        result = subprocess.run(["ps", "-axo", "comm="], capture_output=True, text=True, check=True)
+        # macOS reports app executables as full bundle paths and CLI executables as plain names.
+        running = {posixpath.basename(line.strip()).casefold()
+                   for line in result.stdout.splitlines() if line.strip()}
+        app_names = {"chatgpt", "codex"}
+    else:
+        raise RecoveryError("This release supports macOS and Windows only.")
+    if running & app_names:
         raise RecoveryError("Fully quit ChatGPT/Codex and any Codex CLI sessions, then run this again.")
+
+
+def default_data_dir():
+    """Return the conventional per-user support directory for the current platform."""
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "CodexProjectRecovery"
+    return Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "CodexProjectRecovery"
 
 
 def database_path(home):
@@ -387,8 +408,7 @@ def main(argv=None):
     parser.add_argument("mode", choices=["diagnose", "repair", "snapshot", "undo"], nargs="?", default="diagnose")
     parser.add_argument("--codex-home", type=Path,
                         default=Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))))
-    parser.add_argument("--data-dir", type=Path, default=Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
-                        / "CodexProjectRecovery")
+    parser.add_argument("--data-dir", type=Path, default=default_data_dir())
     parser.add_argument("--match-folders", action="store_true", help="Opt in to unambiguous exact-folder matching")
     parser.add_argument("--backup", type=Path, help="Backup directory to undo, while app is closed")
     args = parser.parse_args(argv)

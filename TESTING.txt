@@ -1,6 +1,6 @@
-PORTABLE EDITION v1.1.0
+MACOS/WINDOWS EDITION v1.2.0
 
-18 automated tests passed using the bundled isolated runtime:
+22 automated tests pass on macOS with Python 3.14:
 - diagnosis is read-only for Codex records
 - existing projects, memberships, renamed projects and unrelated settings survive
 - chat bodies are preserved
@@ -18,14 +18,14 @@ PORTABLE EDITION v1.1.0
 - waiting mode explains how to close Codex and continues automatically
 - automatic repeat runs save a snapshot without rewriting organization
 - diagnosis mode can run without closing the app
-- the private runtime is isolated from installed Python/site-packages
+- both launchers ignore user Python packages and environment overrides
+- macOS uses its Application Support data directory
+- macOS and Windows path normalization are covered
+- macOS process detection blocks an open Codex app
+- macOS process detection permits recovery when the app is closed
 
-Runtime smoke checks passed: startup, SQLite, SHA256, ctypes, subprocess,
-and diagnostic execution. The core recovery was also tested on an isolated
-copy of a damaged installation's records; all non-membership thread fields
-were preserved and SQLite integrity checks passed.
+The core recovery is exercised against synthetic damaged-state fixtures. Tests verify that
+non-membership thread fields remain unchanged and SQLite integrity checks pass. Shell syntax,
+Python bytecode compilation, and archive contents are also checked during packaging.
 
-Additional release checks cover an extracted path containing spaces, a PATH
-without a system Python, runtime licenses, and a private-data exclusion scan.
-
-These checks do not certify every Windows/app version or prevent future bugs.
+These checks do not certify every operating-system/app version or prevent future Codex schema changes.

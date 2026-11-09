@@ -1,7 +1,8 @@
-"""Automatic, foreground-only launcher for the portable Windows recovery edition."""
+"""Automatic, foreground-only launcher for the macOS and Windows recovery utility."""
 import argparse
 import os
 from pathlib import Path
+import platform
 import sys
 import time
 import project_recovery as recovery
@@ -28,12 +29,13 @@ def wait_until_closed(timeout_seconds=86400):
                 print("Your app will not be force-closed. Press Ctrl+C to cancel.\n", flush=True)
                 announced = True
             if time.monotonic() >= deadline:
-                raise recovery.RecoveryError("Timed out waiting for Codex to close. Run START-RECOVERY.bat again.")
+                launcher = "START-RECOVERY.command" if sys.platform == "darwin" else "START-RECOVERY.bat"
+                raise recovery.RecoveryError("Timed out waiting for Codex to close. Run " + launcher + " again.")
             time.sleep(1)
 
 
 def run(home, data, diagnose=False):
-    print("CODEX PROJECT RECOVERY - PORTABLE WINDOWS EDITION", flush=True)
+    print("CODEX PROJECT RECOVERY - " + platform.system().upper() + " EDITION", flush=True)
     print("Restores local project grouping. Creates backups before repairs.", flush=True)
     print("Does not rewrite conversation text or install a background service.\n", flush=True)
     if not diagnose:
@@ -66,8 +68,7 @@ def main():
     parser.add_argument("--diagnose", action="store_true")
     parser.add_argument("--codex-home", type=Path,
                         default=Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))))
-    parser.add_argument("--data-dir", type=Path,
-                        default=Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "CodexProjectRecovery")
+    parser.add_argument("--data-dir", type=Path, default=recovery.default_data_dir())
     args = parser.parse_args()
     try:
         return run(args.codex_home.resolve(), args.data_dir.resolve(), args.diagnose)
@@ -77,7 +78,7 @@ def main():
     except Exception as error:
         print("\nRECOVERY STOPPED", file=sys.stderr, flush=True)
         print(str(error), file=sys.stderr, flush=True)
-        print("Keep any backup folders. Read START-HERE.txt for help.", file=sys.stderr, flush=True)
+        print("Keep any backup folders. Read README.md for help.", file=sys.stderr, flush=True)
         return 1
 
 

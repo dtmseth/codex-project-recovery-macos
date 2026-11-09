@@ -2,4 +2,12 @@
 *.md text eol=lf
 *.txt text eol=lf
 *.bat text eol=crlf
+*.command text eol=lf
 *.zip binary
+
+# Preserve line endings used by these upstream v1.1.0 blobs so the macOS fork diff
+# shows functional changes instead of rewriting every line.
+project_recovery.py -text
+tests/test_recovery.py -text
+PYTHON-LICENSE.txt -text
+START-RECOVERY.bat -text
